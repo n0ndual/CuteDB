@@ -1,63 +1,60 @@
 package org.tigeress.connector;
 
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.ByteBuffer;
 import java.io.IOException;
 
 /**
- * <p>Title: 回应器</p>
- * <p>Description: 用于向客户端发送数据</p>
+ * <p>
+ * Title: 回应器
+ * </p>
+ * <p>
+ * Description: 用于向客户端发送数据
+ * </p>
+ * 
  * @author starboy
  * @version 1.0
  */
 
 public class Response {
-    private SocketChannel socketChannel;
-    private Request request;
-    private Object dataOutput;
-    private byte[] dataOutputBytes;
-    
-    public Response(SocketChannel socketChannel, Request request) {
+	private SelectionKey selectionKey;
+	private Object output;
+	private byte[] outputBytes;
+
+	public Response(SelectionKey selectionKey) {
 		super();
-		this.socketChannel = socketChannel;
-		this.request = request;
+		this.selectionKey = selectionKey;
 	}
 
 	public SocketChannel getSocketChannel() {
-		return socketChannel;
+		return (SocketChannel) selectionKey.channel();
 	}
 
-	public void setSocketChannel(SocketChannel socketChannel) {
-		this.socketChannel = socketChannel;
+	public SelectionKey getSelectionKey() {
+		return selectionKey;
 	}
 
-	public Object getDataOutput() {
-		return dataOutput;
+	public void setSelectionKey(SelectionKey selectionKey) {
+		this.selectionKey = selectionKey;
 	}
 
-	public void setDataOutput(Object dataOutput) {
-		this.dataOutput = dataOutput;
+	public Object getOutput() {
+		return output;
 	}
 
-	public byte[] getDataOutputBytes() {
-		return dataOutputBytes;
+	public void setOutput(Object output) {
+		this.output = output;
 	}
 
-	public void setDataOutputBytes(byte[] dataOutputBytes) {
-		this.dataOutputBytes = dataOutputBytes;
+	public byte[] getOutputBytes() {
+		return outputBytes;
 	}
 
-	public Request getRequest() {
-		return request;
+	public void setOutputBytes(byte[] outputBytes) {
+		this.outputBytes = outputBytes;
 	}
 
-	public void setRequest(Request request) {
-		this.request = request;
-	}
 
-	public Response(SocketChannel socketChannel) {
-        this.socketChannel = socketChannel;
-    }
 
-   
 }

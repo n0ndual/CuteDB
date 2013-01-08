@@ -5,22 +5,24 @@ import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.StandardSocketOptions;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 import org.tigeress.connector.Request;
 
 public class Connector implements Runnable {
-	private static final int DEFAULT_POOL_SIZE = Runtime.getRuntime()
-			.availableProcessors() * 2;
+	public static ArrayBlockingQueue<Response> responses = new ArrayBlockingQueue<Response>(
+			128);
 	private static final int DEFAULT_PORT = 6380;
-	private Executor workerExecutor;
 	private int port;
 	private RequestHandler requestHandler;
 	private ResponseHandler responseHandler;
@@ -29,18 +31,17 @@ public class Connector implements Runnable {
 	private ServerSocketChannel sschannel;
 	private InetSocketAddress address;
 
-	private ReaderPool readerPool;
-	private WriterPool writerPool;
+	private Reader reader;
+	private Writer writer;
 
 	public Connector(int port, RequestHandler requestHandler,
 			ResponseHandler responseHandler) {
 		super();
 		this.port = port;
-		this.workerExecutor = Executors.newFixedThreadPool(DEFAULT_POOL_SIZE);
-		this.readerPool = new ReaderPool(workerExecutor, requestHandler);
-		this.writerPool = new WriterPool(workerExecutor, responseHandler
-				);
-	
+		BlockingQueue list;
+		// this.workerExecutor = Executors.newFixedThreadPool(nThreads);
+		this.reader = new DefaultReader(requestHandler);
+		this.writer = new DefaultWriter(responseHandler);
 	}
 
 	@Override
@@ -77,37 +78,41 @@ public class Connector implements Runnable {
 								// Accept the new connection
 								ServerSocketChannel ssc = (ServerSocketChannel) key
 										.channel();
-							
 
 								SocketChannel sc = ssc.accept();
 								sc.configureBlocking(false);
-
+								sc.setOption(StandardSocketOptions.TCP_NODELAY,
+										false);
 								// 触发接受连接事件
-								Request request = new Request(sc, this);
-							
-
 								// 注册读操作,以进行下一步的读操作
-								sc.register(selector, SelectionKey.OP_READ,
-										request);
+								sc.register(selector, SelectionKey.OP_READ);
 							} else if ((key.readyOps() & SelectionKey.OP_READ) == SelectionKey.OP_READ) {
 								// 提交读服务线程读取客户端数据
-								readerPool.processRead(key);
-								//如果还没关闭socketChannel，那么注册继续读
-							//	if (key.isValid()) {
-						//			key.interestOps(SelectionKey.OP_READ);
-							//	}
+								SocketChannel sc = (SocketChannel) key
+										.channel();
+								reader.read(key);
+								
+								// 如果还没关闭socketChannel，那么注册继续读
+								// if (key.isValid()) {
+								// key.interestOps(SelectionKey.OP_READ);
+								// }
 							} else if ((key.readyOps() & SelectionKey.OP_WRITE) == SelectionKey.OP_WRITE) {
 								// 提交写服务线程向客户端发送回应数据
-								//不使用这种麻烦的方法，写方法直接调用socketChannel.write();
+								// 不使用这种麻烦的方法，写方法直接调用socketChannel.write();
+							//	System.out.println(responses.size() == 0);
+								while (responses.size() != 0) {
+									writer.write(responses.take());
+								}
+								key.interestOps(key.interestOps()
+										& ~SelectionKey.OP_WRITE);
 							}
-
 						}
 					} else {
 						// addRegister(); // 在Selector中注册新的写通道
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
-					
+
 					continue;
 				}
 			}
@@ -118,7 +123,7 @@ public class Connector implements Runnable {
 	}
 
 	public void write(Response response) {
-		writerPool.processWrite(response);
+		writer.write(response);
 	}
 
 	public static void main(String... strings) throws Exception, IOException {
@@ -126,8 +131,7 @@ public class Connector implements Runnable {
 
 			@Override
 			public void handle(Request request) {
-				request.getResponse()
-						.setDataOutputBytes(request.getDataInput());
+				request.getResponse().setOutputBytes(request.getInputBytes());
 				request.done();
 			}
 

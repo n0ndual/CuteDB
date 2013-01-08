@@ -1,97 +1,73 @@
 package org.tigeress.connector;
 
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+
 /**
- * <p>Title: 客户端请求信息类</p>
+ * <p>
+ * Title: 客户端请求信息类
+ * </p>
+ * 
  * @author starboy
  * @version 1.0
  */
 
 public class Request {
-    private SocketChannel sc;
-    private byte[] dataInput = null;;
-    Object attchment;
-    private Response response;
-    private Connector connector;
-    
-    public SocketChannel getSc() {
-		return sc;
+	private SelectionKey selectionKey;
+	private byte[] inputBytes = null;;
+	private Object input;
+	private Response response;
+
+	public byte[] getInputBytes() {
+		return inputBytes;
 	}
-	public void setSc(SocketChannel sc) {
-		this.sc = sc;
+
+	public void setInputBytes(byte[] inputBytes) {
+		this.inputBytes = inputBytes;
 	}
-	public Object getAttchment() {
-		return attchment;
+
+	public Object getInput() {
+		return input;
 	}
-	public void setAttchment(Object attchment) {
-		this.attchment = attchment;
+
+	public void setInput(Object input) {
+		this.input = input;
 	}
-	public Connector getConnector() {
-		return connector;
+
+	public SelectionKey getSelectionKey() {
+		return selectionKey;
 	}
-	public void setConnector(Connector connector) {
-		this.connector = connector;
+
+	public void setSelectionKey(SelectionKey selectionKey) {
+		this.selectionKey = selectionKey;
 	}
+
 	public Response getResponse() {
 		return response;
 	}
+
 	public void setResponse(Response response) {
 		this.response = response;
 	}
-	public void done(){
-		this.connector.write(response);
+
+	public void doneByWritable() {
+		this.response.setSelectionKey(this.selectionKey);
+		Connector.responses.add(response);
+		if (selectionKey.isValid()) {
+			selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_WRITE);
+		}
 	}
 	
-	public Request(){
-		
+	public void done(){
+		DefaultWriter.directWrite(response);
 	}
-	public Request(SocketChannel sc,Connector connector) {
-        this.sc = sc;
-        this.connector=connector;
-        this.response = new Response(sc,this);
-    }
-	public Request(SocketChannel sc){
-		this.sc = sc;
+
+	public Request(SelectionKey selectionKey) {
+		this.selectionKey = selectionKey;
+		this.response = new Response(selectionKey);
 	}
-    public java.net.InetAddress getAddress() {
-        return sc.socket().getInetAddress();
-    }
-    public int getPort() {
-        return sc.socket().getPort();
-    }
-    public boolean isConnected() {
-        return sc.isConnected();
-    }
-    public boolean isBlocking() {
-        return sc.isBlocking();
-    }
-    public boolean isConnectionPending() {
-        return sc.isConnectionPending();
-    }
-    public boolean getKeepAlive() throws java.net.SocketException {
-        return sc.socket().getKeepAlive();
-    }
-    public int getSoTimeout() throws java.net.SocketException {
-        return sc.socket().getSoTimeout();
-    }
-    public boolean getTcpNoDelay() throws java.net.SocketException {
-        return sc.socket().getTcpNoDelay();
-    }
-    public boolean isClosed() {
-        return sc.socket().isClosed();
-    }
-    public void attach(Object obj) {
-        this.attchment = obj;
-    }
-    public Object attachment() {
-        return attchment;
-    }
-    public byte[] getDataInput() {
-        return dataInput;
-    }
-    public void setDataInput(byte[] dataInput) {
-        this.dataInput = dataInput;
-    }
-    
+
+	public Request() {
+	}
 
 }

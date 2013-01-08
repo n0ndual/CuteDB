@@ -3,10 +3,11 @@ package org.tigeress;
 import java.io.IOException;
 
 import org.tigeress.connector.Request;
+import org.tigeress.server.RequestProcessor;
 
 import com.lmax.disruptor.EventHandler;
 
-public class CommandDecoder implements EventHandler<Request> {
+public class CommandDecoder implements RequestProcessor {
 
 	private static final char CR = '\r';
 	private static final char LF = '\n';
@@ -18,8 +19,8 @@ public class CommandDecoder implements EventHandler<Request> {
 	@Override
 	public void onEvent(Request request, long sequence, boolean endOfBatch)
 			throws Exception {
-		Command command = decode(request.getDataInput(), new Cursor(0));
-		request.setAttchment(command);
+		Command command = decode(request.getInputBytes(), new Cursor(0));
+		request.setInput(command);
 	}
 
 	public Command decode(byte[] input, Cursor cursor) throws Exception {
@@ -57,6 +58,7 @@ public class CommandDecoder implements EventHandler<Request> {
 		// the first step, figure out the number of arguments, and init the
 		// bytes;
 		if (input[cursor.getValue()] == '*') {
+
 			int numArgs = readInt(input, cursor.increase(1));
 			if (numArgs > Integer.MAX_VALUE) {
 				throw new IllegalArgumentException(

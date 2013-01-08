@@ -29,10 +29,9 @@ public class DispatchRequestHandler implements RequestHandler {
 
 		@Override
 		public void translateTo(Request request, long sequence) {
-			request.setDataInput(this.request.getDataInput());
-			request.setSc(this.request.getSc());
+			request.setInputBytes(this.request.getInputBytes());
+			request.setSelectionKey(this.request.getSelectionKey());
 			request.setResponse(this.request.getResponse());
-			request.setConnector(this.request.getConnector());
 		}
 	}
 }

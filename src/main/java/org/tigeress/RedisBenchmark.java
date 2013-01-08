@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Clone redis-benchmark
  */
-public class Benchmark {
+public class RedisBenchmark {
 	private static final String help = ""
 			+ "Usage: redis-benchmark [-h <host>] [-p <port>] [-c <clients>] [-n <requests]> [-P <pipelined>] [-d <data size>]\n"
 			+ "\n"
@@ -35,19 +35,19 @@ public class Benchmark {
 	@Argument
 	private static String h = "127.0.0.1";
 	@Argument
-	private static Integer p = 6380;
+	private static Integer PORT = 6379;
 	@Argument
-	private static Integer c = 50;
+	private static Integer PARALLEL_CLIENTS = 100;
 	@Argument
-	private static Integer n = 10000;
+	private static Integer NUM_REQUESTS = 100000;
 	@Argument
-	private static Integer d = 3;
+	private static Integer PAYLOAD = 3;
 	@Argument
-	private static Integer P = 1;
+	private static Integer NUM_PERMITS = 1;
 
 	private static final long NANOS_PER_MILLI = 1000000l;
 	private static final int MILLIS_PER_SECOND = 1000;
-	private static ExecutorService es = Executors.newCachedThreadPool();
+	private static ExecutorService es = Executors.newFixedThreadPool(100);
 
 	private static void benchmark(final String title, final Command command)
 			throws IOException, InterruptedException, ExecutionException {
@@ -64,16 +64,16 @@ public class Benchmark {
 				return super.get(index);
 			}
 		};
-		List<Callable<Void>> benchmarks = new ArrayList<Callable<Void>>(c);
-		for (int j = 0; j < c; j++) {
+		List<Callable<Void>> benchmarks = new ArrayList<Callable<Void>>(PARALLEL_CLIENTS);
+		for (int j = 0; j < PARALLEL_CLIENTS; j++) {
 			benchmarks.add(new Callable<Void>() {
 				@Override
 				public Void call() throws IOException, InterruptedException {
-					RedisClient redisClient = new RedisClient(h, p);
-					final Semaphore semaphore = new Semaphore(P);
-					for (int i = 0; i < n / c; i++) {
+					RedisClient redisClient = new RedisClient(h, PORT);
+					final Semaphore semaphore = new Semaphore(NUM_PERMITS);
+					for (int i = 0; i < NUM_REQUESTS / PARALLEL_CLIENTS; i++) {
 						final long commandstart = System.nanoTime();
-						if (P == 1) {
+						if (NUM_PERMITS == 1) {
 							redisClient.execute(title, command);
 							long commandend = System.nanoTime();
 							int bin = (int) ((commandend - commandstart) / NANOS_PER_MILLI);
@@ -93,7 +93,7 @@ public class Benchmark {
 							}, es);
 						}
 					}
-					semaphore.acquire(P);
+					semaphore.acquire(NUM_PERMITS);
 					redisClient.close();
 					return null;
 				}
@@ -107,31 +107,30 @@ public class Benchmark {
 		long end = System.nanoTime();
 		double seconds = ((double) end - start) / NANOS_PER_MILLI
 				/ MILLIS_PER_SECOND;
-		double rate = n / seconds;
-		System.out.printf("  %d requests completed in %.2f seconds\n", n,
+		double rate = NUM_REQUESTS / seconds;
+		System.out.printf("  %d requests completed in %.2f seconds\n", NUM_REQUESTS,
 				seconds);
-		System.out.printf("  %d parallel clients\n", c);
-		System.out.printf("  %d outstanding requests\n", P);
-		System.out.printf("  %d bytes payload\n", d);
+		System.out.printf("  %d parallel clients\n", PARALLEL_CLIENTS);
+		System.out.printf("  %d outstanding requests\n", NUM_PERMITS);
+		System.out.printf("  %d bytes payload\n", PAYLOAD);
 		System.out.println();
 		double total = 0;
 		int milli = 0;
 		for (AtomicInteger bin : bins) {
 			total += bin.intValue();
 			if (milli++ == 0) {
-				System.out.printf("%.2f%% < 1 millisecond\n", total * 100 / n);
+			//	System.out.printf("%.2f%% < 1 millisecond\n", total * 100 / NUM_REQUESTS);
 			} else {
-				System.out.printf("%.2f%% <= %d milliseconds\n", total * 100
-						/ n, milli);
+			//	System.out.printf("%.2f%% <= %d milliseconds\n", total * 100
+			//		/ NUM_REQUESTS, milli);
 			}
 		}
-		System.out.println();
-		System.out.printf("%.2f requests per second\n\n", rate);
+		//System.out.println();
+		//System.out.printf("%.2f requests per second\n\n", rate);
 	}
 
 	public static void main(String[] args) throws IOException,
 			ExecutionException, InterruptedException {
-		new Thread(new CuteServer()).run();
 		List<String> parse;
 		try {
 			parse = Args.parse(Benchmark.class, args);
@@ -143,7 +142,7 @@ public class Benchmark {
 				byte[] counter = "counter:rand:000000000000".getBytes();
 				byte[] list = "mylist".getBytes();
 				byte[] set = "myset".getBytes();
-				byte[] data = new byte[d];
+				byte[] data = new byte[PAYLOAD];
 				Object[] objects = new Object[21];
 				objects[0] = "MSET";
 				for (int i = 1; i < objects.length - 1; i += 2) {
@@ -151,7 +150,7 @@ public class Benchmark {
 					objects[i + 1] = data;
 				}
 				// Delete it all
-				RedisClient redisClient = new RedisClient(h, p);
+				RedisClient redisClient = new RedisClient(h, PORT);
 				redisClient.del(new Object[] { key, counter, list, set });
 				redisClient.close();
 
